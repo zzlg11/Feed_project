@@ -1,0 +1,29 @@
+{
+  "beam_search_config": {
+    "beam_size": 0,
+    "max_length": 0,
+    "token_threshold": 0,
+    "topk": 0
+  },
+  "debug": false,
+  "env": "local",
+  "global_config": {
+    "ask_mode_use_tools": "false",
+    "command_allow_list": "",
+    "command_deny_list": "rm,mv,sudo,wget,curl,chown",
+    "display_language": "",
+    "displaylanguage": "",
+    "edit_file_tool": "false",
+    "editfiletool": "false",
+    "enable_auto_memory": true,
+    "endpoint": "",
+    "http_proxy": "",
+    "mcp_auto_run": "disable",
+    "notification_time": {},
+    "preferred_language": "zh-cn",
+    "proxy_mode": "system",
+    "quest_mode_enable": "enable",
+    "terminal_run_mode": "autoRun",
+    "web_tools_execution_mode": "enabledAskEveryTime"
+  }
+}
