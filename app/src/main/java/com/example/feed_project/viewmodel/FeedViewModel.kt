@@ -10,6 +10,7 @@ import com.example.feed_project.repository.FeedRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 
 class FeedViewModel : ViewModel() {
@@ -134,4 +135,38 @@ class FeedViewModel : ViewModel() {
     fun clearExposureLogs() {
         _exposureLogs.value = emptyList()
     }
+
+
+    fun loadMoreFeeds() {
+    if (_isLoading.value || !_canLoadMore.value) return
+
+    viewModelScope.launch {
+        _isLoading.value = true
+        _hasError.value = false
+
+        try {
+            delay(1500)
+            val result = repository.fetchFeeds(currentPage)
+            if (result.isSuccess) {
+                val newFeeds = result.getOrNull() ?: emptyList()
+                if (newFeeds.isEmpty()) {
+                    _canLoadMore.value = false
+                } else {
+                    _feeds.value = _feeds.value + newFeeds
+                    currentPage++
+                }
+            } else {
+                _hasError.value = true
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+            }
+        } catch (e: Exception) {
+            _hasError.value = true
+            _errorMessage.value = e.message ?: "Network error"
+        } finally {
+            _isLoading.value = false
+        }
+    }
+}
+
+
 }

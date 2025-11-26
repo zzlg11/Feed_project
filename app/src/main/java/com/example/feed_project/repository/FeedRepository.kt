@@ -4,7 +4,6 @@ import com.example.feed_project.model.CardType
 import com.example.feed_project.model.FeedItem
 import com.example.feed_project.model.LayoutType
 import kotlinx.coroutines.delay
-import com.example.feed_project.model.DoubleColumnPosition
 
 class FeedRepository {
     companion object {
@@ -12,15 +11,14 @@ class FeedRepository {
         private const val REFRESH_SIZE = 5        // 刷新5条数据
     }
 
+    //挂起函数suspend在后台线程模拟网络请求
     suspend fun fetchFeeds(page: Int): Result<List<FeedItem>> {
         return try {
             delay(1500) // 模拟网络延迟
-
             // 模拟网络错误情况（第5页模拟网络错误）
-            if (page == 5) {
+            if (page == 4) {
                 return Result.failure(Exception("Network error"))
             }
-
             val startIndex = page * INITIAL_PAGE_SIZE
             val endIndex = startIndex + INITIAL_PAGE_SIZE
 
@@ -28,10 +26,9 @@ class FeedRepository {
                 FeedItem(
                     id = "item_$index",
                     title = "动态 ${index+1}",
-                    content = "这是初始动态内容. ",
-                    imageUrl = if (index % 3 != 0) "https://picsum.photos/seed/$index/400/300" else null,
-                    cardType = when (index % 3) {
-                        0 -> CardType.TEXT_ONLY
+                    content = "这是初始动态内容${index+1}.",
+                    imageUrl =  "https://picsum.photos/seed/${index+1}/400/300" ,
+                    cardType = when (index % 2) {
                         1 -> CardType.IMAGE_TOP
                         else -> CardType.IMAGE_BOTTOM
                     },
@@ -40,7 +37,6 @@ class FeedRepository {
 
                 )
             }
-
             Result.success(items)
         } catch (e: Exception) {
             Result.failure(e)
@@ -49,7 +45,6 @@ class FeedRepository {
 
     suspend fun refreshFeeds(): Result<List<FeedItem>> {
         val timeSuffix = System.currentTimeMillis().toString().takeLast(3)
-
         return try {
             delay(1500) // 模拟网络延迟
 
@@ -72,7 +67,6 @@ class FeedRepository {
 
                 )
             }
-
             Result.success(items)
         } catch (e: Exception) {
             Result.failure(e)

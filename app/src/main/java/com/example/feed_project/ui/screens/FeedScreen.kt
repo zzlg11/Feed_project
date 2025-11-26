@@ -69,6 +69,19 @@ fun FeedScreen(
         }
     }
 
+    // 监听是否滚动到列表底部，实现上拉刷新
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .collect { lastIndex ->
+                if (lastIndex != null && lastIndex >= renderItems.size - 1) {
+                    // 滚动到底部，如果还有更多数据且当前未在加载，则加载更多
+                    if (canLoadMore && !isLoading && !isRefreshing) {
+                        viewModel.loadMoreFeeds()
+                    }
+                }
+            }
+    }
+
     ExposureTrackerForCompose(
         lazyListState = listState,
         itemIds = feedItemIds,
@@ -76,16 +89,6 @@ fun FeedScreen(
             viewModel.addExposureLog(ExposureLog(itemId, event))
         }
     )
-
-//    // 替换原来的 ExposureTrackerForCompose 调用
-//    AdvancedExposureTracker(
-//        lazyListState = listState,
-//        itemIds = feedItemIds, // 注意：仍需解决 renderItems vs feeds 对齐问题！
-//        onExposureEvent = { itemId, event ->
-//            viewModel.addExposureLog(ExposureLog(itemId, event))
-//        }
-//    )
-
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -215,6 +218,7 @@ fun FeedScreen(
         )
     }
 }
+
 
 
 

@@ -43,7 +43,7 @@ fun Modifier.clickAndLongClick(
 }
 
 
-// 在 FeedCard.kt 文件中添加以下组件
+
 @Composable
 fun ZoomableImage(
     imageUrl: String,
