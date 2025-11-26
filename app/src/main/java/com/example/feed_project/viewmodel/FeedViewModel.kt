@@ -38,41 +38,48 @@ class FeedViewModel : ViewModel() {
     val exposureLogs: StateFlow<List<ExposureLog>> = _exposureLogs
 
     private var currentPage = 0
+    private var pendingRetryPage: Int? = null
 
     init {
         loadFeeds()
     }
 
-    fun loadFeeds() {
-        if (_isLoading.value || !_canLoadMore.value) return
+fun loadFeeds() {
+    if (_isLoading.value || !_canLoadMore.value) return
 
-        viewModelScope.launch {
-            _isLoading.value = true
-            _hasError.value = false
+    viewModelScope.launch {
+        _isLoading.value = true
+        _hasError.value = false
 
-            try {
-                val result = repository.fetchFeeds(currentPage)
-                if (result.isSuccess) {
-                    val newFeeds = result.getOrNull() ?: emptyList()
-                    _feeds.value = _feeds.value + newFeeds
+        try {
+            val pageToLoad = pendingRetryPage ?: currentPage
+            val result = repository.fetchFeeds(pageToLoad)  // 修正：使用 pageToLoad 而不是 currentPage
+            if (result.isSuccess) {
+                val newFeeds = result.getOrNull() ?: emptyList()
+                _feeds.value = _feeds.value + newFeeds
 
-                    if (newFeeds.isEmpty()) {
-                        _canLoadMore.value = false
-                    } else {
-                        currentPage++
-                    }
+                if (newFeeds.isEmpty()) {
+                    _canLoadMore.value = false
                 } else {
-                    _hasError.value = true
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                    currentPage++
                 }
-            } catch (e: Exception) {
+
+                pendingRetryPage = null
+            } else {
                 _hasError.value = true
-                _errorMessage.value = e.message ?: "Network error"
-            } finally {
-                _isLoading.value = false
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                pendingRetryPage = pageToLoad
             }
+        } catch (e: Exception) {
+            _hasError.value = true
+            _errorMessage.value = e.message ?: "Network error"
+            pendingRetryPage = currentPage
+        } finally {
+            _isLoading.value = false
         }
     }
+}
+
 
     fun refreshFeeds() {
         viewModelScope.launch {
@@ -118,6 +125,8 @@ class FeedViewModel : ViewModel() {
     fun retry() {
         if (_hasError.value) {
             if (_feeds.value.isEmpty()) {
+                _hasError.value = false
+                _errorMessage.value = ""
                 loadFeeds()
             } else {
                 // 如果已有数据，则尝试加载更多
@@ -146,7 +155,8 @@ class FeedViewModel : ViewModel() {
 
         try {
             delay(1500)
-            val result = repository.fetchFeeds(currentPage)
+            val pageToLoad = pendingRetryPage ?: currentPage  // 添加：支持重试逻辑
+            val result = repository.fetchFeeds(pageToLoad)   // 修正：使用 pageToLoad
             if (result.isSuccess) {
                 val newFeeds = result.getOrNull() ?: emptyList()
                 if (newFeeds.isEmpty()) {
@@ -155,18 +165,22 @@ class FeedViewModel : ViewModel() {
                     _feeds.value = _feeds.value + newFeeds
                     currentPage++
                 }
+                pendingRetryPage = null  // 添加：成功后清除待重试页面
             } else {
                 _hasError.value = true
                 _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                pendingRetryPage = pageToLoad  // 添加：记录待重试页面
             }
         } catch (e: Exception) {
             _hasError.value = true
             _errorMessage.value = e.message ?: "Network error"
+            pendingRetryPage = currentPage  // 添加：记录待重试页面
         } finally {
             _isLoading.value = false
         }
     }
 }
+
 
 
 }

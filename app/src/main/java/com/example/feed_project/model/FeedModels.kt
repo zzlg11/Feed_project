@@ -16,7 +16,9 @@ enum class DoubleColumnPosition {
 enum class CardType {
     TEXT_ONLY,
     IMAGE_TOP,
-    IMAGE_BOTTOM
+    IMAGE_BOTTOM,
+
+    VIDEO
 }
 
 enum class LayoutType {

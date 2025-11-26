@@ -11,13 +11,21 @@ class FeedRepository {
         private const val REFRESH_SIZE = 5        // 刷新5条数据
     }
 
+    private val pageRetryCount = mutableMapOf<Int, Int>()
     //挂起函数suspend在后台线程模拟网络请求
     suspend fun fetchFeeds(page: Int): Result<List<FeedItem>> {
         return try {
             delay(1500) // 模拟网络延迟
             // 模拟网络错误情况（第5页模拟网络错误）
-            if (page == 4) {
-                return Result.failure(Exception("Network error"))
+            if (page %3 == 2) {
+                val retryCount = pageRetryCount.getOrDefault(page, 0)
+                if (retryCount == 0) {
+                    pageRetryCount[page] = retryCount + 1
+                    return Result.failure(Exception("Network error"))
+                } else {
+                    // 重试时清除重试计数
+                    pageRetryCount.remove(page)
+                }
             }
             val startIndex = page * INITIAL_PAGE_SIZE
             val endIndex = startIndex + INITIAL_PAGE_SIZE
@@ -28,8 +36,9 @@ class FeedRepository {
                     title = "动态 ${index+1}",
                     content = "这是初始动态内容${index+1}.",
                     imageUrl =  "https://picsum.photos/seed/${index+1}/400/300" ,
-                    cardType = when (index % 2) {
+                    cardType = when (index % 3) {
                         1 -> CardType.IMAGE_TOP
+                        2 -> CardType.VIDEO
                         else -> CardType.IMAGE_BOTTOM
                     },
                     //layoutType = if (index % 7 == 5 || index % 7 == 6)
@@ -56,7 +65,7 @@ class FeedRepository {
                     content = "这是一条新刷新的动态内容。",
                     imageUrl = if (index % 3 != 0) "https://picsum.photos/seed/refresh${System.currentTimeMillis()}_$index/400/300" else null,
                     cardType = when (index % 3) {
-                        0 -> CardType.TEXT_ONLY
+                        0 -> CardType.VIDEO
                         1 -> CardType.IMAGE_TOP
                         else -> CardType.IMAGE_BOTTOM
                     },

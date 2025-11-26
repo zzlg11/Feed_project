@@ -14,10 +14,17 @@ import com.example.feed_project.model.CardType
 import com.example.feed_project.model.FeedItem
 import androidx.compose.ui.composed
 import androidx.compose.foundation.*
-import androidx.compose.foundation.lazy.LazyListState
-import com.example.feed_project.model.ExposureLog
-import com.example.feed_project.ui.utils.AdvancedExposureTracker
-import com.example.feed_project.ui.components.ExposureTestTool
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Favorite
+
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -60,11 +67,11 @@ fun ZoomableImage(
                 if (isZoomed) {
                     Modifier
                         .fillMaxWidth()
-                        .height(400.dp)
+                        .height(300.dp)
                 } else {
                     Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(180.dp)
                 }
             )
             .clickable { onToggleZoom(!isZoomed) },
@@ -81,6 +88,22 @@ fun FeedCard(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isImageZoomed by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var remainingTime by remember { mutableStateOf(10) } // 10秒倒计时
+    var isLiked by remember { mutableStateOf(false) } // 添加点赞状态
+    val coroutineScope = rememberCoroutineScope()
+
+    // 倒计时逻辑
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (remainingTime > 0) {
+                delay(1000)
+                remainingTime--
+            }
+            isPlaying = false
+            remainingTime = 10
+        }
+    }
 
     Card(
         modifier = Modifier
@@ -88,7 +111,16 @@ fun FeedCard(
             .defaultMinSize(minHeight = 325.dp)
             .padding(4.dp)
             .clickAndLongClick(
-                onClick = { onCardClick(feedItem.id) },
+                onClick = {
+                    if (feedItem.cardType == CardType.VIDEO) {
+                        isPlaying = !isPlaying
+                        if (!isPlaying) {
+                            remainingTime = 10 // 重置倒计时
+                        }
+                    } else {
+                        onCardClick(feedItem.id)
+                    }
+                },
                 onLongClick = { showDeleteDialog = true }
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -127,7 +159,49 @@ fun FeedCard(
                 CardType.TEXT_ONLY -> {
                     FeedCardContent(feedItem)
                 }
+
+                CardType.VIDEO -> {
+                    // 视频播放器模拟
+                    VideoPlayerSimulator(
+                        isPlaying = isPlaying,
+                        remainingTime = remainingTime,
+                        onPlayPauseToggle = {
+                           //播放完成后重置状态
+                            if (remainingTime == 0) {
+                                remainingTime = 10 // 重置倒计时
+                            }
+                            isPlaying = !isPlaying
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FeedCardContent(feedItem)
+                }
             }
+            // 修改 FeedCard 中的点赞按钮部分
+Box(
+    modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 8.dp)
+) {
+    // 使用 Box 替代 IconButton 来避免内部尺寸限制
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .align(Alignment.CenterEnd) // 右对齐
+            .clickable { isLiked = !isLiked },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.Favorite,
+            contentDescription = if (isLiked) "取消点赞" else "点赞",
+            tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(24.dp) // 适当大小的图标
+        )
+    }
+}
+
+
         }
     }
 
@@ -168,6 +242,72 @@ fun FeedCardContent(feedItem: FeedItem) {
         Text(
             text = feedItem.content,
             style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+fun VideoPlayerSimulator(
+    isPlaying: Boolean,
+    remainingTime: Int,
+    onPlayPauseToggle: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .background(Color.Black)
+    ) {
+        // 视频缩略图占位符
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            Text(
+                text = "视频卡片",
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        // 播放控制按钮
+        if (!isPlaying && remainingTime > 0) {
+            IconButton(
+                onClick = onPlayPauseToggle,
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "播放",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                )
+            }
+        }
+
+        // 暂停按钮 - 仅在播放时显示
+        if (isPlaying && remainingTime > 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onPlayPauseToggle() }
+            )
+        }
+
+
+        // 倒计时显示
+        Text(
+            text = "$remainingTime 秒",
+            color = Color.White,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         )
     }
 }
