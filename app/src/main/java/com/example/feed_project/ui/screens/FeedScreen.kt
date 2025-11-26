@@ -70,17 +70,33 @@ fun FeedScreen(
     }
 
     // 监听是否滚动到列表底部，实现上拉刷新
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .collect { lastIndex ->
-                if (lastIndex != null && lastIndex >= renderItems.size - 1) {
-                    // 滚动到底部，如果还有更多数据且当前未在加载，则加载更多
-                    if (canLoadMore && !isLoading && !isRefreshing) {
-                        viewModel.loadMoreFeeds()
-                    }
-                }
-            }
+    // 监听是否滚动到列表底部，实现上拉刷新
+var hasInitiallyScrolled by remember { mutableStateOf(false) }
+
+LaunchedEffect(listState) {
+    snapshotFlow {
+        val layoutInfo = listState.layoutInfo
+        layoutInfo.visibleItemsInfo.lastOrNull()?.index to layoutInfo.totalItemsCount
     }
+    .collect { (lastVisibleIndex, totalItemsCount) ->
+        // 标记是否已经滚动过
+        if (lastVisibleIndex != null && lastVisibleIndex > 0) {
+            hasInitiallyScrolled = true
+        }
+
+        // 只有在用户主动滚动且接近底部时才触发加载
+        if (hasInitiallyScrolled &&
+            lastVisibleIndex != null &&
+            lastVisibleIndex >= totalItemsCount - 2 &&
+            canLoadMore &&
+            !isLoading &&
+            !isRefreshing) {
+            viewModel.loadMoreFeeds()
+        }
+    }
+}
+
+
 
     ExposureTrackerForCompose(
         lazyListState = listState,

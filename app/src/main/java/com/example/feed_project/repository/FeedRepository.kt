@@ -16,7 +16,7 @@ class FeedRepository {
     suspend fun fetchFeeds(page: Int): Result<List<FeedItem>> {
         return try {
             delay(1500) // 模拟网络延迟
-            // 模拟网络错误情况（第5页模拟网络错误）
+            // 模拟网络错误情况（每三页报错）
             if (page %3 == 2) {
                 val retryCount = pageRetryCount.getOrDefault(page, 0)
                 if (retryCount == 0) {
