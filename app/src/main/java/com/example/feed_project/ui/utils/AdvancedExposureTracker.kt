@@ -2,7 +2,6 @@ package com.example.feed_project.ui.utils
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
-import com.example.feed_project.model.ExposureEvent
 import kotlinx.coroutines.delay
 
 @Composable

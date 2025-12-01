@@ -17,7 +17,7 @@ enum class ExposureEvent {
 fun ExposureTrackerForCompose(
     lazyListState: LazyListState,
     itemIds: List<String>,
-    onExposureEvent: (String, com.example.feed_project.model.ExposureEvent) -> Unit,
+    onExposureEvent: (String, com.example.feed_project.domain.model.ExposureEvent) -> Unit,
     debounceMs: Long = 100L
 ) {
     var lastVisibleIds by remember { mutableStateOf(emptySet<String>()) }
@@ -31,12 +31,12 @@ fun ExposureTrackerForCompose(
 
         // 新出现的 item → 触发 VISIBLE
         (currentVisibleIds - lastVisibleIds).forEach { id ->
-            onExposureEvent(id, com.example.feed_project.model.ExposureEvent.VISIBLE)
+            onExposureEvent(id, com.example.feed_project.domain.model.ExposureEvent.VISIBLE)
         }
 
         // 消失的 item → 触发 INVISIBLE
         (lastVisibleIds - currentVisibleIds).forEach { id ->
-            onExposureEvent(id, com.example.feed_project.model.ExposureEvent.INVISIBLE)
+            onExposureEvent(id, com.example.feed_project.domain.model.ExposureEvent.INVISIBLE)
         }
 
         lastVisibleIds = currentVisibleIds

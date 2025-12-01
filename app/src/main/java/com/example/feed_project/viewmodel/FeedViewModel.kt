@@ -3,10 +3,10 @@ package com.example.feed_project.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.feed_project.model.ExposureEvent
-import com.example.feed_project.model.ExposureLog
-import com.example.feed_project.model.FeedItem
-import com.example.feed_project.repository.FeedRepository
+import com.example.feed_project.domain.model.ExposureEvent
+import com.example.feed_project.domain.model.ExposureLog
+import com.example.feed_project.domain.model.FeedItem
+import com.example.feed_project.data.repository.FeedRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch

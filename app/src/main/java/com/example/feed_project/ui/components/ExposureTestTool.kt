@@ -12,8 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.feed_project.model.ExposureEvent
-import com.example.feed_project.model.ExposureLog
+import com.example.feed_project.domain.model.ExposureEvent
+import com.example.feed_project.domain.model.ExposureLog
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.material.icons.filled.ArrowDropDown

@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
-import com.example.feed_project.model.CardType
-import com.example.feed_project.model.FeedItem
+import com.example.feed_project.domain.model.CardType
+import com.example.feed_project.domain.model.FeedItem
 import androidx.compose.ui.composed
 import androidx.compose.foundation.*
 import kotlinx.coroutines.delay
@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Pause
+import com.example.feed_project.core.PluginManager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Favorite
@@ -89,6 +89,12 @@ fun FeedCard(
     onCardClick: (String) -> Unit = {},
     isDoubleColumn: Boolean = false
 ) {
+    val plugin = PluginManager.getPlugin(feedItem.cardType)
+
+    if (plugin != null) {
+        // 使用插件渲染卡片
+        plugin.Render(feedItem)
+    } else{
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isImageZoomed by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -182,6 +188,13 @@ fun FeedCard(
                     Spacer(modifier = Modifier.height(8.dp))
                     FeedCardContent(feedItem)
                 }
+
+                CardType.CAROUSEL -> {
+
+                    Text("Carousel 卡片待实现", style = MaterialTheme.typography.bodyMedium)
+                    FeedCardContent(feedItem)
+                }
+
             }
             // 修改 FeedCard 中的点赞按钮部分
 Box(
@@ -234,6 +247,7 @@ Box(
             }
         )
     }
+}
 }
 
 @Composable

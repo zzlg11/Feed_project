@@ -17,12 +17,12 @@ import com.example.feed_project.ui.components.FeedCard
 import com.example.feed_project.viewmodel.FeedViewModel
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import com.example.feed_project.model.LayoutType
-import com.example.feed_project.model.FeedItem
+import com.example.feed_project.domain.model.LayoutType
+import com.example.feed_project.domain.model.FeedItem
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.example.feed_project.ui.utils.ExposureTrackerForCompose
-import com.example.feed_project.model.ExposureLog
-import com.example.feed_project.ui.utils.AdvancedExposureTracker
+import com.example.feed_project.domain.model.ExposureLog
+
 // 👇 在文件顶部（或单独文件）定义辅助类
 private sealed interface FeedRenderItem
 private data class SingleColumnItem(val feed: FeedItem) : FeedRenderItem
@@ -45,7 +45,11 @@ fun FeedScreen(
     var itemToDelete by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
-    val feedItemIds = remember(feeds) { feeds.map { it.id } }
+    val feedItemIds: List<String> = remember(feeds) { feeds.map { it.id } }
+
+
+
+
 
     val renderItems = remember(feeds) {
         buildList {
