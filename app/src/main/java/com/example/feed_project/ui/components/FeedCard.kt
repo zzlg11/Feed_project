@@ -55,7 +55,8 @@ fun Modifier.clickAndLongClick(
 fun ZoomableImage(
     imageUrl: String,
     isZoomed: Boolean,
-    onToggleZoom: (Boolean) -> Unit
+    onToggleZoom: (Boolean) -> Unit,
+    isDoubleColumn: Boolean = false // 添加参数
 ) {
     val painter = rememberImagePainter(data = imageUrl)
 
@@ -67,11 +68,11 @@ fun ZoomableImage(
                 if (isZoomed) {
                     Modifier
                         .fillMaxWidth()
-                        .height(300.dp)
+                        .height(if (isDoubleColumn) 200.dp else 300.dp) // 双栏模式使用更小的高度
                 } else {
                     Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .height(if (isDoubleColumn) 150.dp else 180.dp) // 双栏模式使用更小的高度
                 }
             )
             .clickable { onToggleZoom(!isZoomed) },
@@ -80,11 +81,13 @@ fun ZoomableImage(
 }
 
 
+
 @Composable
 fun FeedCard(
     feedItem: FeedItem,
     onDeleteRequest: (String) -> Unit,
-    onCardClick: (String) -> Unit = {}
+    onCardClick: (String) -> Unit = {},
+    isDoubleColumn: Boolean = false
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isImageZoomed by remember { mutableStateOf(false) }
@@ -137,7 +140,8 @@ fun FeedCard(
                         ZoomableImage(
                             imageUrl = it,
                             isZoomed = isImageZoomed,
-                            onToggleZoom = { isImageZoomed = it }
+                            onToggleZoom = { isImageZoomed = it },
+                            isDoubleColumn = isDoubleColumn
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -151,7 +155,8 @@ fun FeedCard(
                         ZoomableImage(
                             imageUrl = it,
                             isZoomed = isImageZoomed,
-                            onToggleZoom = { isImageZoomed = it }
+                            onToggleZoom = { isImageZoomed = it },
+                            isDoubleColumn = isDoubleColumn
                         )
                     }
                 }
@@ -171,7 +176,8 @@ fun FeedCard(
                                 remainingTime = 10 // 重置倒计时
                             }
                             isPlaying = !isPlaying
-                        }
+                        },
+                        isDoubleColumn = isDoubleColumn
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     FeedCardContent(feedItem)
@@ -250,12 +256,14 @@ fun FeedCardContent(feedItem: FeedItem) {
 fun VideoPlayerSimulator(
     isPlaying: Boolean,
     remainingTime: Int,
-    onPlayPauseToggle: () -> Unit
+    onPlayPauseToggle: () -> Unit,
+    isDoubleColumn: Boolean = false
 ) {
+    val videoHeight = if (isDoubleColumn) 150.dp else 180.dp
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(videoHeight)
             .background(Color.Black)
     ) {
         // 视频缩略图占位符

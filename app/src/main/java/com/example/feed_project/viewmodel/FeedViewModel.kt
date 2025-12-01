@@ -40,46 +40,54 @@ class FeedViewModel : ViewModel() {
     private var currentPage = 0
     private var pendingRetryPage: Int? = null
 
+    private var isUsingCacheData = false
+
     init {
         loadFeeds()
     }
 
-fun loadFeeds() {
-    if (_isLoading.value || !_canLoadMore.value) return
 
-    viewModelScope.launch {
-        _isLoading.value = true
-        _hasError.value = false
 
-        try {
-            val pageToLoad = pendingRetryPage ?: currentPage
-            val result = repository.fetchFeeds(pageToLoad)  // 修正：使用 pageToLoad 而不是 currentPage
-            if (result.isSuccess) {
-                val newFeeds = result.getOrNull() ?: emptyList()
-                _feeds.value = _feeds.value + newFeeds
+    fun loadFeeds() {
+        if (_isLoading.value || !_canLoadMore.value) return
 
-                if (newFeeds.isEmpty()) {
-                    _canLoadMore.value = false
+        viewModelScope.launch {
+            _isLoading.value = true
+            _hasError.value = false
+
+            try {
+                val pageToLoad = pendingRetryPage ?: currentPage
+                val result = repository.fetchFeeds(pageToLoad)
+                if (result.isSuccess) {
+                    val newFeeds = result.getOrNull() ?: emptyList()
+                    if (newFeeds.isEmpty()) {
+                        _canLoadMore.value = false
+                    } else {
+                        // 对新加载的数据进行正确编号
+                        val currentSize = _feeds.value.size
+                        val numberedFeeds = newFeeds.mapIndexed { index, feedItem ->
+                            feedItem.copy(
+                                title = "动态 ${currentSize + index + 1}"
+                            )
+                        }
+                        _feeds.value = _feeds.value + numberedFeeds
+                        currentPage++
+                    }
+                    pendingRetryPage = null
                 } else {
-                    currentPage++
+                    _hasError.value = true
+                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                    pendingRetryPage = pageToLoad
                 }
-
-                pendingRetryPage = null
-            } else {
+            } catch (e: Exception) {
                 _hasError.value = true
-                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
-                pendingRetryPage = pageToLoad
+                _errorMessage.value = e.message ?: "Network error"
+                pendingRetryPage = currentPage
+            } finally {
+                _isLoading.value = false
             }
-        } catch (e: Exception) {
-            _hasError.value = true
-            _errorMessage.value = e.message ?: "Network error"
-            pendingRetryPage = currentPage
-        } finally {
-            _isLoading.value = false
         }
     }
-}
-
 
     fun refreshFeeds() {
         viewModelScope.launch {
@@ -103,7 +111,9 @@ fun loadFeeds() {
                     }
 
                     _feeds.value = renumberedFeeds
-                    // 不重置 currentPage，保持分页状态（如适用）
+                    // 重置分页状态，因为现在数据已经重新排列
+                    currentPage = 0
+                    pendingRetryPage = null
                 } else {
                     _hasError.value = true
                     _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
@@ -145,42 +155,8 @@ fun loadFeeds() {
         _exposureLogs.value = emptyList()
     }
 
-
     fun loadMoreFeeds() {
-    if (_isLoading.value || !_canLoadMore.value) return
-
-    viewModelScope.launch {
-        _isLoading.value = true
-        _hasError.value = false
-
-        try {
-            delay(1500)
-            val pageToLoad = pendingRetryPage ?: currentPage  // 添加：支持重试逻辑
-            val result = repository.fetchFeeds(pageToLoad)   // 修正：使用 pageToLoad
-            if (result.isSuccess) {
-                val newFeeds = result.getOrNull() ?: emptyList()
-                if (newFeeds.isEmpty()) {
-                    _canLoadMore.value = false
-                } else {
-                    _feeds.value = _feeds.value + newFeeds
-                    currentPage++
-                }
-                pendingRetryPage = null  // 添加：成功后清除待重试页面
-            } else {
-                _hasError.value = true
-                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
-                pendingRetryPage = pageToLoad  // 添加：记录待重试页面
-            }
-        } catch (e: Exception) {
-            _hasError.value = true
-            _errorMessage.value = e.message ?: "Network error"
-            pendingRetryPage = currentPage  // 添加：记录待重试页面
-        } finally {
-            _isLoading.value = false
-        }
+        loadFeeds() // 复用 loadFeeds 方法
     }
-}
-
-
 
 }

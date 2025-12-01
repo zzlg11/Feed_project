@@ -70,7 +70,6 @@ fun FeedScreen(
     }
 
     // 监听是否滚动到列表底部，实现上拉刷新
-    // 监听是否滚动到列表底部，实现上拉刷新
 var hasInitiallyScrolled by remember { mutableStateOf(false) }
 
 LaunchedEffect(listState) {
@@ -155,7 +154,8 @@ LaunchedEffect(listState) {
                                     onDeleteRequest = { id ->
                                         itemToDelete = id
                                         showDeleteDialog = true
-                                    }
+                                    },
+                                    isDoubleColumn = true
                                 )
                             }
                             if (renderItem.right != null) {
@@ -165,7 +165,8 @@ LaunchedEffect(listState) {
                                         onDeleteRequest = { id ->
                                             itemToDelete = id
                                             showDeleteDialog = true
-                                        }
+                                        },
+                                        isDoubleColumn = true
                                     )
                                 }
                             } else {
