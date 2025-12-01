@@ -22,6 +22,8 @@ import com.example.feed_project.domain.model.FeedItem
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.example.feed_project.ui.utils.ExposureTrackerForCompose
 import com.example.feed_project.domain.model.ExposureLog
+import kotlinx.coroutines.delay
+
 
 // 👇 在文件顶部（或单独文件）定义辅助类
 private sealed interface FeedRenderItem
@@ -99,7 +101,15 @@ LaunchedEffect(listState) {
     }
 }
 
-
+// 添加预加载的 LaunchedEffect
+    LaunchedEffect(feeds.size) {
+        // 当列表有一定数据量时，预加载刷新数据
+        if (feeds.size > 5) {
+            // 延迟一段时间后预加载
+            delay(500) // 5秒后
+            viewModel.prefetchRefreshData()
+        }
+    }
 
     ExposureTrackerForCompose(
         lazyListState = listState,

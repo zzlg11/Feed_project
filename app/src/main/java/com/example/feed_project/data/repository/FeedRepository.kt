@@ -24,7 +24,7 @@ class FeedRepository {
             if (page %3 == 2) {
                 val retryCount = pageRetryCount.getOrDefault(page, 0)
                 if (retryCount == 0) {
-                    pageRetryCount[page] = retryCount + 1
+                    pageRetryCount[page] = 1
                     //网络错误时尝试使用缓存数据
                     if (feedCache.containsKey(page)) {
                         return Result.success(feedCache[page]!!)
@@ -72,13 +72,16 @@ class FeedRepository {
         return try {
             delay(1500) // 模拟网络延迟
 
+            // 提取公共时间戳，避免在循环中重复调用
+            val baseTimestamp = System.currentTimeMillis()
+
             // 刷新时加载REFRESH_SIZE条新数据，编号从1开始
             val items = (1..REFRESH_SIZE).map { index ->
                 FeedItem(
                     id = "refresh_item_${timeSuffix}_$index",
                     title = "动态 $index",
                     content = "这是一条新刷新的动态内容。",
-                    imageUrl = if (index % 3 != 0) "https://picsum.photos/seed/refresh${System.currentTimeMillis()}_$index/400/300" else null,
+                    imageUrl = if (index % 3 != 0) "https://picsum.photos/seed/refresh${baseTimestamp}_$index/400/300" else null,
                     cardType = when (index % 3) {
                         0 -> CardType.VIDEO
                         1 -> CardType.IMAGE_TOP
@@ -103,6 +106,7 @@ class FeedRepository {
     }
 
     //清除缓存功能
+    @Suppress("unused")
     fun clearCache() {
         feedCache.clear()
         refreshCache = emptyList()

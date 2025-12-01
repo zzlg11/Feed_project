@@ -45,7 +45,7 @@ fun ExposureTestTool(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Feed类客户端",
+                    text = "FeedFlow客户端",
                     style = MaterialTheme.typography.titleLarge
                 )
 

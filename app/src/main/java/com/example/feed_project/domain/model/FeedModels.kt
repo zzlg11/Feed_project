@@ -1,5 +1,5 @@
 package com.example.feed_project.domain.model
-import com.example.feed_project.domain.model.LayoutType
+
 
 data class FeedItem(
     val id: String,

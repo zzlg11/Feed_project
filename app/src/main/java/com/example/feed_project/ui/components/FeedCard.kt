@@ -23,6 +23,7 @@ import com.example.feed_project.core.PluginManager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Favorite
+import coil.compose.rememberAsyncImagePainter
 
 
 
@@ -31,7 +32,6 @@ import androidx.compose.material.icons.outlined.Favorite
 fun Modifier.clickAndLongClick(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    longPressTimeoutMillis: Long = 500L
 ) = composed {
     var isLongPressed by remember { mutableStateOf(false) }
 
@@ -58,8 +58,7 @@ fun ZoomableImage(
     onToggleZoom: (Boolean) -> Unit,
     isDoubleColumn: Boolean = false // 添加参数
 ) {
-    val painter = rememberImagePainter(data = imageUrl)
-
+    val painter = rememberAsyncImagePainter(model = imageUrl)
     Image(
         painter = painter,
         contentDescription = null,

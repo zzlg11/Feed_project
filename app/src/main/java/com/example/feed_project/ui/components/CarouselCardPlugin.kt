@@ -18,6 +18,7 @@ import coil.compose.rememberImagePainter
 import com.example.feed_project.core.CardPlugin
 import com.example.feed_project.domain.model.CardType
 import com.example.feed_project.domain.model.FeedItem
+import coil.compose.rememberAsyncImagePainter
 
 class CarouselCardPlugin : CardPlugin {
     override val cardType = CardType.CAROUSEL
@@ -46,7 +47,7 @@ class CarouselCardPlugin : CardPlugin {
                     // 显示当前图片
                     if (images.isNotEmpty()) {
                         Image(
-                            painter = rememberImagePainter(images[currentIndex].trim()),
+                            painter = rememberAsyncImagePainter(images[currentIndex].trim()),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier

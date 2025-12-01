@@ -1,4 +1,3 @@
-// 文件路径: src/main/java/com/example/feed_project/core/CardRendererRegistry.kt
 package com.example.feed_project.core
 
 import com.example.feed_project.core.CardRenderer

@@ -3,17 +3,17 @@ package com.example.feed_project.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.feed_project.domain.model.ExposureEvent
 import com.example.feed_project.domain.model.ExposureLog
 import com.example.feed_project.domain.model.FeedItem
 import com.example.feed_project.data.repository.FeedRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.example.feed_project.ui.utils.PreloadManager
+import com.example.feed_project.domain.model.CardType
 import kotlinx.coroutines.delay
 
-
-class FeedViewModel : ViewModel() {
+class FeedViewModel() : ViewModel() {
     private val repository = FeedRepository()
 
     private val _feeds = MutableStateFlow<List<FeedItem>>(emptyList())
@@ -42,91 +42,155 @@ class FeedViewModel : ViewModel() {
 
     private var isUsingCacheData = false
 
+
     init {
         loadFeeds()
     }
 
-
-
     fun loadFeeds() {
-        if (_isLoading.value || !_canLoadMore.value) return
+    if (_isLoading.value || !_canLoadMore.value) return
 
-        viewModelScope.launch {
-            _isLoading.value = true
-            _hasError.value = false
+    viewModelScope.launch {
+        _isLoading.value = true
+        _hasError.value = false
 
-            try {
-                val pageToLoad = pendingRetryPage ?: currentPage
-                val result = repository.fetchFeeds(pageToLoad)
-                if (result.isSuccess) {
-                    val newFeeds = result.getOrNull() ?: emptyList()
-                    if (newFeeds.isEmpty()) {
-                        _canLoadMore.value = false
-                    } else {
-                        // 对新加载的数据进行正确编号
-                        val currentSize = _feeds.value.size
-                        val numberedFeeds = newFeeds.mapIndexed { index, feedItem ->
-                            feedItem.copy(
-                                title = "动态 ${currentSize + index + 1}"
-                            )
+        try {
+            val pageToLoad = pendingRetryPage ?: currentPage
+            val result = repository.fetchFeeds(pageToLoad)
+            if (result.isSuccess) {
+                val newFeeds = result.getOrNull() ?: emptyList()
+
+                // 图片预加载 - 简化版本
+                val imageUrls = newFeeds.flatMap { feedItem ->
+                    mutableListOf<String>().apply {
+                        feedItem.imageUrl?.let { add(it) }
+                        // 轮播图图片预加载
+                        if (feedItem.cardType == CardType.CAROUSEL) {
+                            addAll(feedItem.content.split(",").map { it.trim() })
                         }
-                        _feeds.value = _feeds.value + numberedFeeds
-                        currentPage++
                     }
-                    pendingRetryPage = null
+                }
+
+                // 执行图片预加载
+                if (imageUrls.isNotEmpty()) {
+                    PreloadManager.getInstance().preloadImages(imageUrls)
+                }
+
+                if (newFeeds.isEmpty()) {
+                    _canLoadMore.value = false
                 } else {
-                    _hasError.value = true
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
-                    pendingRetryPage = pageToLoad
+                    // 对新加载的数据进行正确编号
+                    val currentSize = _feeds.value.size
+                    val numberedFeeds = newFeeds.mapIndexed { index, feedItem ->
+                        feedItem.copy(
+                            title = "动态 ${currentSize + index + 1}"
+                        )
+                    }
+                    _feeds.value = _feeds.value + numberedFeeds
+                    currentPage++
+                }
+                pendingRetryPage = null
+            } else {
+                _hasError.value = true
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                pendingRetryPage = pageToLoad
+            }
+        } catch (e: Exception) {
+            _hasError.value = true
+            _errorMessage.value = e.message ?: "Network error"
+            pendingRetryPage = currentPage
+        } finally {
+            _isLoading.value = false
+        }
+    }
+}
+
+    // 添加预加载方法
+    fun prefetchRefreshData() {
+        viewModelScope.launch {
+            try {
+                // 提前获取即将刷新的数据并预加载图片
+                val prefetchResult = repository.refreshFeeds()
+                if (prefetchResult.isSuccess) {
+                    val prefetchedFeeds = prefetchResult.getOrNull() ?: emptyList()
+
+                    // 预加载图片
+                    val imageUrls = prefetchedFeeds.flatMap { feedItem ->
+                        mutableListOf<String>().apply {
+                            feedItem.imageUrl?.let { add(it) }
+                            if (feedItem.cardType == CardType.CAROUSEL) {
+                                addAll(feedItem.content.split(",").map { it.trim() })
+                            }
+                        }
+                    }
+
+                    if (imageUrls.isNotEmpty()) {
+                        PreloadManager.getInstance().preloadImages(imageUrls)
+                    }
                 }
             } catch (e: Exception) {
-                _hasError.value = true
-                _errorMessage.value = e.message ?: "Network error"
-                pendingRetryPage = currentPage
-            } finally {
-                _isLoading.value = false
+                // 静默处理预加载错误，不影响主流程
             }
         }
     }
 
     fun refreshFeeds() {
-        viewModelScope.launch {
-            _isRefreshing.value = true
-            _hasError.value = false
+    viewModelScope.launch {
+        _isRefreshing.value = true
+        _hasError.value = false
 
-            try {
-                val result = repository.refreshFeeds()
-                if (result.isSuccess) {
-                    val refreshedFeeds = result.getOrNull() ?: emptyList()
-                    val existingFeeds = _feeds.value ?: emptyList()
+        try {
+            val result = repository.refreshFeeds()
+            if (result.isSuccess) {
+                val refreshedFeeds = result.getOrNull() ?: emptyList()
+                val existingFeeds = _feeds.value ?: emptyList()
 
-                    // 新数据放在顶部，旧数据保持原有顺序在后面
-                    val mergedFeeds = refreshedFeeds + existingFeeds
+                // 新数据放在顶部，旧数据保持原有顺序在后面
+                val mergedFeeds = refreshedFeeds + existingFeeds
 
-                    // 重新编号：从顶部开始为 1, 2, 3...
-                    val renumberedFeeds = mergedFeeds.mapIndexed { index, feedItem ->
-                        feedItem.copy(
-                            title = "动态 ${index + 1}"
-                        )
+                // 重新编号：从顶部开始为 1, 2, 3...
+                val renumberedFeeds = mergedFeeds.mapIndexed { index, feedItem ->
+                    feedItem.copy(
+                        title = "动态 ${index + 1}"
+                    )
+                }
+
+                _feeds.value = renumberedFeeds
+                // 重置分页状态，因为现在数据已经重新排列
+                currentPage = 0
+                pendingRetryPage = null
+
+                // 延迟执行图片预加载，让用户先看到内容
+                launch {
+                    delay(100) // 短暂延迟
+                    // 图片预加载 - 下拉刷新时也执行
+                    val imageUrls = refreshedFeeds.flatMap { feedItem ->
+                        mutableListOf<String>().apply {
+                            feedItem.imageUrl?.let { add(it) }
+                            // 轮播图图片预加载
+                            if (feedItem.cardType == CardType.CAROUSEL) {
+                                addAll(feedItem.content.split(",").map { it.trim() })
+                            }
+                        }
                     }
 
-                    _feeds.value = renumberedFeeds
-                    // 重置分页状态，因为现在数据已经重新排列
-                    currentPage = 0
-                    pendingRetryPage = null
-                } else {
-                    _hasError.value = true
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                    // 执行图片预加载
+                    if (imageUrls.isNotEmpty()) {
+                        PreloadManager.getInstance().preloadImages(imageUrls)
+                    }
                 }
-            } catch (e: Exception) {
+            } else {
                 _hasError.value = true
-                _errorMessage.value = e.message ?: "Refresh failed"
-            } finally {
-                _isRefreshing.value = false
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+            }
+        } catch (e: Exception) {
+            _hasError.value = true
+            _errorMessage.value = e.message ?: "Refresh failed"
+        } finally {
+            _isRefreshing.value = false
             }
         }
     }
-
 
     fun deleteFeed(id: String) {
         _feeds.value = _feeds.value.filter { it.id != id }
@@ -156,7 +220,7 @@ class FeedViewModel : ViewModel() {
     }
 
     fun loadMoreFeeds() {
-        loadFeeds() // 复用 loadFeeds 方法
+        loadFeeds()
     }
 
 }
