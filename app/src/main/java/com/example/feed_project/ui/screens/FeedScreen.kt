@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import com.example.feed_project.ui.utils.ExposureTrackerForCompose
 import com.example.feed_project.domain.model.ExposureLog
 import kotlinx.coroutines.delay
+import androidx.compose.ui.viewinterop.AndroidView
 
 
 // 👇 在文件顶部（或单独文件）定义辅助类
@@ -49,9 +50,12 @@ fun FeedScreen(
     val listState = rememberLazyListState()
     val feedItemIds: List<String> = remember(feeds) { feeds.map { it.id } }
 
+    var showNonEssentialComponents by remember { mutableStateOf(false) }
 
-
-
+    LaunchedEffect(Unit) {
+        delay(500) // 延迟500毫秒加载非关键组件
+        showNonEssentialComponents = true
+    }
 
     val renderItems = remember(feeds) {
         buildList {
@@ -76,32 +80,32 @@ fun FeedScreen(
     }
 
     // 监听是否滚动到列表底部，实现上拉刷新
-var hasInitiallyScrolled by remember { mutableStateOf(false) }
+    var hasInitiallyScrolled by remember { mutableStateOf(false) }
 
-LaunchedEffect(listState) {
-    snapshotFlow {
-        val layoutInfo = listState.layoutInfo
-        layoutInfo.visibleItemsInfo.lastOrNull()?.index to layoutInfo.totalItemsCount
-    }
-    .collect { (lastVisibleIndex, totalItemsCount) ->
-        // 标记是否已经滚动过
-        if (lastVisibleIndex != null && lastVisibleIndex > 0) {
-            hasInitiallyScrolled = true
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            layoutInfo.visibleItemsInfo.lastOrNull()?.index to layoutInfo.totalItemsCount
         }
+        .collect { (lastVisibleIndex, totalItemsCount) ->
+            // 标记是否已经滚动过
+            if (lastVisibleIndex != null && lastVisibleIndex > 0) {
+                hasInitiallyScrolled = true
+            }
 
-        // 只有在用户主动滚动且接近底部时才触发加载
-        if (hasInitiallyScrolled &&
-            lastVisibleIndex != null &&
-            lastVisibleIndex >= totalItemsCount - 2 &&
-            canLoadMore &&
-            !isLoading &&
-            !isRefreshing) {
-            viewModel.loadMoreFeeds()
+            // 只有在用户主动滚动且接近底部时才触发加载
+            if (hasInitiallyScrolled &&
+                lastVisibleIndex != null &&
+                lastVisibleIndex >= totalItemsCount - 2 &&
+                canLoadMore &&
+                !isLoading &&
+                !isRefreshing) {
+                viewModel.loadMoreFeeds()
+            }
         }
     }
-}
 
-// 添加预加载的 LaunchedEffect
+    // 添加预加载的 LaunchedEffect
     LaunchedEffect(feeds.size) {
         // 当列表有一定数据量时，预加载刷新数据
         if (feeds.size > 5) {
@@ -128,14 +132,15 @@ LaunchedEffect(listState) {
             modifier = Modifier.fillMaxSize(),
             state = listState
         ) {
-            item {
-                ExposureTestTool(
-                    exposureLogs = exposureLogs,
-                    onClearLogs = { viewModel.clearExposureLogs() },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            if (showNonEssentialComponents) {
+                item {
+                    ExposureTestTool(
+                        exposureLogs = exposureLogs,
+                        onClearLogs = { viewModel.clearExposureLogs() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-
             if (hasError && feeds.isEmpty()) {
                 item {
                     ErrorItem(
@@ -150,7 +155,7 @@ LaunchedEffect(listState) {
                 when (renderItem) {
                     is SingleColumnItem -> {
                         Box(modifier = Modifier.fillMaxWidth()) {
-                            FeedCard(
+                            FeedCardWrapper(
                                 feedItem = renderItem.feed,
                                 onDeleteRequest = { id ->
                                     itemToDelete = id
@@ -163,7 +168,7 @@ LaunchedEffect(listState) {
                     is DoubleColumnPair -> {
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Box(modifier = Modifier.weight(1f)) {
-                                FeedCard(
+                                FeedCardWrapper(
                                     feedItem = renderItem.left,
                                     onDeleteRequest = { id ->
                                         itemToDelete = id
@@ -174,7 +179,7 @@ LaunchedEffect(listState) {
                             }
                             if (renderItem.right != null) {
                                 Box(modifier = Modifier.weight(1f)) {
-                                    FeedCard(
+                                    FeedCardWrapper(
                                         feedItem = renderItem.right,
                                         onDeleteRequest = { id ->
                                             itemToDelete = id
@@ -253,68 +258,100 @@ LaunchedEffect(listState) {
 
 
 
-@Composable
-fun LoadingItem(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("加载中...")
-        }
-    }
-}
-
-@Composable
-fun ErrorItem(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
+    @Composable
+    fun LoadingItem(modifier: Modifier = Modifier) {
+        Box(
+            modifier = modifier
                 .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = onRetry) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("重试")
+                Text("加载中...")
             }
         }
     }
-}
 
-@Composable
-fun NoMoreDataItem(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+    @Composable
+    fun ErrorItem(
+        message: String,
+        onRetry: () -> Unit,
+        modifier: Modifier = Modifier
     ) {
-        Text(
-            text = "没有更多数据了",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Card(
+            modifier = modifier
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = onRetry) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("重试")
+                }
+            }
+        }
     }
-}
+
+    @Composable
+    fun NoMoreDataItem(modifier: Modifier = Modifier) {
+        Box(
+            modifier = modifier
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "没有更多数据了",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    @Composable
+    fun FeedCardWrapper(
+        feedItem: FeedItem,
+        onDeleteRequest: (String) -> Unit,
+        onCardClick: (String) -> Unit = {},
+        isDoubleColumn: Boolean = false
+    ) {
+        // 尝试获取预渲染的卡片
+        val viewModel: FeedViewModel = viewModel()
+        val preRenderedView = viewModel.getPreRenderedCard(feedItem.id)
+
+        if (preRenderedView != null) {
+            // 使用预渲染的视图
+            AndroidView(
+                factory = { context ->
+                    preRenderedView
+                }
+            )
+        } else {
+            // 回退到正常渲染
+            FeedCard(
+                feedItem = feedItem,
+                onDeleteRequest = onDeleteRequest,
+                onCardClick = onCardClick,
+                isDoubleColumn = isDoubleColumn
+            )
+        }
+    }
+
+
+

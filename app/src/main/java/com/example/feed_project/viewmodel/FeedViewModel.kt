@@ -12,6 +12,21 @@ import kotlinx.coroutines.launch
 import com.example.feed_project.ui.utils.PreloadManager
 import com.example.feed_project.domain.model.CardType
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import androidx.compose.ui.platform.ComposeView
+import android.view.View
+import android.content.Context
+import androidx.lifecycle.LifecycleOwner
+import androidx.compose.material3.Text
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.example.feed_project.ui.components.FeedCard
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.widget.ImageView
+import android.view.ViewGroup
+import androidx.core.graphics.createBitmap
+
 
 class FeedViewModel() : ViewModel() {
     private val repository = FeedRepository()
@@ -43,99 +58,129 @@ class FeedViewModel() : ViewModel() {
     private var isUsingCacheData = false
 
 
+    // 添加防抖控制
+    private var refreshJob: Job? = null
+    private var loadJob: Job? = null
+    private var prefetchJob: Job? = null
+
+    private val PRELOAD_THRESHOLD = 3
+
+    // 预渲染缓存
+    private val preRenderedCards = mutableMapOf<String, View>()
+    private var composeView: ComposeView? = null
+    private var context: Context? = null
+    private var lifecycleOwner: LifecycleOwner? = null
+
+    // 预渲染队列
+    private val preRenderQueue = mutableListOf<FeedItem>()
+    private var isPreRendering = false
+
     init {
         loadFeeds()
     }
 
+
     fun loadFeeds() {
-    if (_isLoading.value || !_canLoadMore.value) return
+        if (_isLoading.value || !_canLoadMore.value) return
 
-    viewModelScope.launch {
-        _isLoading.value = true
-        _hasError.value = false
+        loadJob?.cancel()
 
-        try {
-            val pageToLoad = pendingRetryPage ?: currentPage
-            val result = repository.fetchFeeds(pageToLoad)
-            if (result.isSuccess) {
-                val newFeeds = result.getOrNull() ?: emptyList()
+        loadJob = viewModelScope.launch {
+            _isLoading.value = true
+            _hasError.value = false
 
-                // 图片预加载 - 简化版本
-                val imageUrls = newFeeds.flatMap { feedItem ->
+            try {
+                val pageToLoad = pendingRetryPage ?: currentPage
+                val result = repository.fetchFeeds(pageToLoad)
+                if (result.isSuccess) {
+                    val newFeeds = result.getOrNull() ?: emptyList()
+
+                    // 异步预加载图片，不阻塞主线程
+                    preloadImagesAsync(newFeeds)
+
+                    if (newFeeds.isEmpty()) {
+                        _canLoadMore.value = false
+                    } else {
+                        val currentSize = _feeds.value.size
+                        val numberedFeeds = newFeeds.mapIndexed { index, feedItem ->
+                            feedItem.copy(
+                                title = "动态 ${currentSize + index + 1}"
+                            )
+                        }
+                        _feeds.value = _feeds.value + numberedFeeds
+                        currentPage++
+                    }
+                    pendingRetryPage = null
+                } else {
+                    _hasError.value = true
+                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
+                    pendingRetryPage = pageToLoad
+                }
+            } catch (e: Exception) {
+                _hasError.value = true
+                _errorMessage.value = e.message ?: "Network error"
+                pendingRetryPage = currentPage
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // 异步预加载图片
+    private fun preloadImagesAsync(feeds: List<FeedItem>) {
+        viewModelScope.launch {
+            try {
+                val imageUrls = feeds.flatMap { feedItem ->
                     mutableListOf<String>().apply {
                         feedItem.imageUrl?.let { add(it) }
-                        // 轮播图图片预加载
                         if (feedItem.cardType == CardType.CAROUSEL) {
                             addAll(feedItem.content.split(",").map { it.trim() })
                         }
                     }
                 }
 
-                // 执行图片预加载
                 if (imageUrls.isNotEmpty()) {
                     PreloadManager.getInstance().preloadImages(imageUrls)
                 }
 
-                if (newFeeds.isEmpty()) {
-                    _canLoadMore.value = false
-                } else {
-                    // 对新加载的数据进行正确编号
-                    val currentSize = _feeds.value.size
-                    val numberedFeeds = newFeeds.mapIndexed { index, feedItem ->
-                        feedItem.copy(
-                            title = "动态 ${currentSize + index + 1}"
-                        )
-                    }
-                    _feeds.value = _feeds.value + numberedFeeds
-                    currentPage++
+                // 同时触发预渲染
+                if (context != null && lifecycleOwner != null) {
+                    preRenderCards(feeds)
                 }
-                pendingRetryPage = null
-            } else {
-                _hasError.value = true
-                _errorMessage.value = result.exceptionOrNull()?.message ?: "Unknown error"
-                pendingRetryPage = pageToLoad
+            } catch (e: Exception) {
+                // 静默处理预加载错误
             }
-        } catch (e: Exception) {
-            _hasError.value = true
-            _errorMessage.value = e.message ?: "Network error"
-            pendingRetryPage = currentPage
-        } finally {
-            _isLoading.value = false
         }
     }
-}
+
+
 
     // 添加预加载方法
-    fun prefetchRefreshData() {
-        viewModelScope.launch {
+    fun prefetchRefreshData(visibleItemCount: Int = 0) {
+        // 根据可见项目数决定是否需要预加载
+        if (visibleItemCount < PRELOAD_THRESHOLD) return
+
+        prefetchJob?.cancel()
+
+        prefetchJob = viewModelScope.launch {
             try {
-                // 提前获取即将刷新的数据并预加载图片
                 val prefetchResult = repository.refreshFeeds()
                 if (prefetchResult.isSuccess) {
                     val prefetchedFeeds = prefetchResult.getOrNull() ?: emptyList()
-
-                    // 预加载图片
-                    val imageUrls = prefetchedFeeds.flatMap { feedItem ->
-                        mutableListOf<String>().apply {
-                            feedItem.imageUrl?.let { add(it) }
-                            if (feedItem.cardType == CardType.CAROUSEL) {
-                                addAll(feedItem.content.split(",").map { it.trim() })
-                            }
-                        }
-                    }
-
-                    if (imageUrls.isNotEmpty()) {
-                        PreloadManager.getInstance().preloadImages(imageUrls)
-                    }
+                    preloadImagesAsync(prefetchedFeeds)
                 }
             } catch (e: Exception) {
-                // 静默处理预加载错误，不影响主流程
+                // 静默处理预加载错误
             }
         }
     }
 
+
     fun refreshFeeds() {
-    viewModelScope.launch {
+    // 防止并发刷新
+    if (_isRefreshing.value) return
+    refreshJob?.cancel()
+    refreshJob=viewModelScope.launch {
         _isRefreshing.value = true
         _hasError.value = false
 
@@ -222,5 +267,132 @@ class FeedViewModel() : ViewModel() {
     fun loadMoreFeeds() {
         loadFeeds()
     }
+
+
+    fun setupPreRenderContext(context: Context, lifecycleOwner: LifecycleOwner) {
+        this.context = context
+        this.lifecycleOwner = lifecycleOwner
+        this.composeView = ComposeView(context).apply {
+        setContent {
+            Text("PreRender ComposeView")
+        }
+    }
+
+    }
+
+    fun preRenderCards(feeds: List<FeedItem>) {
+        if (isPreRendering || feeds.isEmpty()) return
+
+        viewModelScope.launch {
+            isPreRendering = true
+            try {
+                // 清理过期的预渲染视图
+                cleanupOldPreRenders()
+
+                // 预渲染可见区域附近的卡片
+                val itemsToPreRender = feeds.take(5) // 预渲染前5个卡片
+
+                itemsToPreRender.forEach { feedItem ->
+                    if (!preRenderedCards.containsKey(feedItem.id)) {
+                        preRenderSingleCard(feedItem)
+                    }
+                }
+            } catch (e: Exception) {
+                // 静默处理预渲染错误
+            } finally {
+                isPreRendering = false
+            }
+        }
+    }
+
+    private suspend fun preRenderSingleCard(feedItem: FeedItem) {
+        withContext(Dispatchers.Main.immediate) {
+            try {
+                composeView?.setContent {
+                    FeedCard(
+                        feedItem = feedItem,
+                        onDeleteRequest = {},
+                        onCardClick = {}
+                    )
+                }
+
+                // 触发测量和布局
+                composeView?.measure(
+                    View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+
+                composeView?.layout(0, 0, composeView!!.measuredWidth, composeView!!.measuredHeight)
+
+                // 创建 Bitmap 并绘制当前视图内容
+                val bitmap = createBitmap(
+                    composeView!!.width,
+                    composeView!!.height,
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bitmap)
+                composeView?.draw(canvas)
+
+                // 可以选择将 bitmap 包装成 ImageView 或其他容器进行复用
+                val imageView = ImageView(context)
+                imageView.setImageBitmap(bitmap)
+
+                preRenderedCards[feedItem.id] = imageView
+            } catch (e: Exception) {
+                // 静默处理单个卡片预渲染错误
+            }
+        }
+    }
+
+
+    private fun cleanupOldPreRenders() {
+        // 保留最近使用的预渲染卡片，清理旧的
+        if (preRenderedCards.size > 20) {
+            val keysToRemove = preRenderedCards.keys.take(preRenderedCards.size - 15)
+            keysToRemove.forEach { key ->
+                preRenderedCards.remove(key)?.let { view ->
+                    // 清理视图资源
+                    cleanupView(view)
+                }
+            }
+        }
+    }
+
+    private fun cleanupView(view: View) {
+        // 清理视图相关资源
+        try {
+            // 移除视图引用
+            if (view.parent != null) {
+                (view.parent as? ViewGroup)?.removeView(view)
+            }
+        } catch (e: Exception) {
+            // 静默处理清理错误
+        }
+    }
+
+    fun getPreRenderedCard(id: String): View? {
+        return preRenderedCards[id]?.also {
+            // 使用后从缓存中移除，避免重复使用
+            preRenderedCards.remove(id)
+        }
+    }
+
+    fun clearPreRenderCache() {
+        preRenderedCards.values.forEach { view ->
+            cleanupView(view)
+        }
+        preRenderedCards.clear()
+        preRenderQueue.clear()
+    }
+
+    // 在 ViewModel 清理时调用
+    override fun onCleared() {
+        clearPreRenderCache()
+        composeView = null
+        context = null
+        lifecycleOwner = null
+        super.onCleared()
+    }
+
 
 }
