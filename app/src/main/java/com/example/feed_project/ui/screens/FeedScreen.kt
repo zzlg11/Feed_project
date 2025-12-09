@@ -26,7 +26,6 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.viewinterop.AndroidView
 
 
-// 👇 在文件顶部（或单独文件）定义辅助类
 private sealed interface FeedRenderItem
 private data class SingleColumnItem(val feed: FeedItem) : FeedRenderItem
 private data class DoubleColumnPair(val left: FeedItem, val right: FeedItem?) : FeedRenderItem

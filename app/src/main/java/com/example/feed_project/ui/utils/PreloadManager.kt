@@ -1,7 +1,6 @@
 package com.example.feed_project.ui.utils
 
 import android.content.Context
-import com.example.feed_project.ui.utils.ImagePreloader
 
 
 class PreloadManager private constructor(context: Context) {

@@ -45,7 +45,7 @@ fun FeedScreenWithSkeleton() {
     // 在数据加载完成前显示骨架屏
     if (feeds.isEmpty() && isLoading) {
         LazyColumn {
-            items(8) {  // 显示5个骨架屏
+            items(8) {
                 SkeletonCard()
             }
         }

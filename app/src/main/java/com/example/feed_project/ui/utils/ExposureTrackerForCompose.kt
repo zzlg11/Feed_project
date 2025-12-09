@@ -6,12 +6,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 
-enum class ExposureEvent {
-    VISIBLE,
-    VISIBLE_50_PERCENT,
-    FULLY_VISIBLE,
-    INVISIBLE
-}
 
 @Composable
 fun ExposureTrackerForCompose(
